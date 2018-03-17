@@ -1,4 +1,3 @@
-import boto3
 import datetime
 import os
 import sys
@@ -6,10 +5,8 @@ import placebo
 import pytest
 import uuid
 
-from botocore.stub import Stubber
 from sam.bucket import Bucket
 
-# TODO replace Stubber with placebo
 @pytest.fixture
 def settings():
     '''
@@ -19,55 +16,68 @@ def settings():
     settings['bucket'] = 'test-lambda-%s' % uuid.uuid4()
     return settings
 
-def test_bucket_initialize(settings):
-    bucket = Bucket(settings)
+@pytest.fixture
+def session():
+    import boto3
+    return boto3.Session()
+
+@pytest.fixture
+def pill(tmpdir, session):
+    '''
+    Get placebo for simulate boto3 calls
+    '''
+    pill = placebo.attach(session, tmpdir)
+    pill.playback()
+    yield pill
+    pill.stop()
+
+def test_bucket_initialize(settings, pill):
+    bucket = Bucket(settings, pill.session)
     assert(bucket.name == settings['bucket'])
 
-def test_bucket_exists(settings):
-    bucket = Bucket(settings)
-
-    stubber = Stubber(bucket.client)
+def test_bucket_exists(settings, pill):
     response = {
         'Buckets': [{
             'CreationDate': datetime.datetime(2018, 1, 10, 1, 10, 16),
             'Name': settings['bucket']
         }]
     }
-    expected_params = {}
+    pill.save_response(service='s3', operation='ListBuckets', response_data=response, http_response=200)
 
-    stubber.add_response('list_buckets', response, expected_params)
-    stubber.activate()
-
+    bucket = Bucket(settings, pill.session)
     exists = bucket.bucket_exists()
     assert(exists)
 
-def test_bucket_does_not_exist(settings):
-    bucket = Bucket(settings)
-    stubber = Stubber(bucket.client)
-
+def test_bucket_does_not_exist(settings, pill):
     response = {
         'Buckets': []
     }
-    expected_params = {}
-    stubber.add_response('list_buckets', response, expected_params)
+    pill.save_response(service='s3', operation='ListBuckets', response_data=response, http_response=200)
 
-    stubber.activate()
-
+    bucket = Bucket(settings, pill.session)
     exists = bucket.bucket_exists()
     assert(not exists)
 
-def test_bucket_create(settings):
-    bucket = Bucket(settings)
-    stubber = Stubber(bucket.client)
-
+def test_bucket_create(settings, pill):
     response = {'Buckets': []}
-    stubber.add_response('list_buckets', response)
+    pill.save_response(service='s3', operation='ListBuckets', response_data=response, http_response=200)
 
     response = {'Location': '/%s' % settings['bucket'], 'ResponseMetadata': {'HTTPHeaders': {'content-length': '0', 'location': '/%s' % settings['bucket'], 'server': 'AmazonS3', 'x-amz-id-2': 'xyz', 'x-amz-request-id': 'xyz'}, 'HTTPStatusCode': 200, 'HostId': 'xyz', 'RequestId': 'xyz', 'RetryAttempts': 0}}
-    expected_params = {'Bucket': settings['bucket']}
-    stubber.add_response('create_bucket', response, expected_params)
+    pill.save_response(service='s3', operation='CreateBucket', response_data=response, http_response=200)
 
-    stubber.activate()
-
+    bucket = Bucket(settings, pill.session)
     status = bucket.create_bucket()
     assert(status['ResponseMetadata']['HTTPStatusCode'] == 200)
+    assert(status['Location'] == '/%s' % settings['bucket'])
+
+def test_bucket_upload_file(settings, pill, tmpdir):
+    response = {"status_code": 200, "data": { "ResponseMetadata": { "RequestId": "xyz", "HostId": "xyz", "HTTPStatusCode": 200, "HTTPHeaders": { "x-amz-id-2": "xyz", "x-amz-request-id": "xyz", "etag": "\"xyz\"", "content-length": "0", "server": "AmazonS3" }, "RetryAttempts": 0 }, "ETag": "\"xyz\"" } }
+    pill.save_response(service='s3', operation='PutObject', response_data=response, http_response=200)
+
+    filename = 'test_file.txt'
+    p = tmpdir.join(filename)
+    p.write('content')
+    filepath = str(p)
+
+    bucket = Bucket(settings, pill.session)
+    status = bucket.upload_file(filepath, filename)
