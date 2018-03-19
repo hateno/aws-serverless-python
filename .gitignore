@@ -8,10 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-<<<<<<< HEAD
 env/
-=======
->>>>>>> Add Bucket creation
 build/
 develop-eggs/
 dist/
@@ -27,10 +24,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-<<<<<<< HEAD
-=======
 MANIFEST
->>>>>>> Add Bucket creation
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -52,10 +46,7 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
-<<<<<<< HEAD
-=======
 .pytest_cache/
->>>>>>> Add Bucket creation
 
 # Translations
 *.mo
@@ -64,10 +55,7 @@ coverage.xml
 # Django stuff:
 *.log
 local_settings.py
-<<<<<<< HEAD
-=======
 db.sqlite3
->>>>>>> Add Bucket creation
 
 # Flask stuff:
 instance/
@@ -94,7 +82,6 @@ celerybeat-schedule
 # SageMath parsed files
 *.sage.py
 
-<<<<<<< HEAD
 # dotenv
 .env
 
@@ -111,7 +98,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
->>>>>>> Add Bucket creation
 
 # Spyder project settings
 .spyderproject
@@ -128,3 +114,4 @@ venv.bak/
 
 # custom
 settings.json
+tmp/

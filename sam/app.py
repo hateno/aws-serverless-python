@@ -4,11 +4,6 @@ import os
 import shutil
 import sys
 
-from troposphere import GetAtt, Template, Ref
-from troposphere.apigateway import Integration, Method, RestApi, Resource
-from troposphere.awslambda import Code, Function
-from troposphere.iam import Policy, Role
-
 __version__ = '0.0.1'
 
 class App(object):

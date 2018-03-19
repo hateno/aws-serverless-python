@@ -13,7 +13,7 @@ def settings():
     Default settings for bucket object creation
     '''
     settings = dict()
-    settings['bucket'] = 'test-lambda-%s' % uuid.uuid4()
+    settings['bucket'] = 'UnitTestBucket'
     return settings
 
 @pytest.fixture
