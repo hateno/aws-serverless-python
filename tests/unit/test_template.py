@@ -64,3 +64,19 @@ def test_stack_exists(cloud, pill):
 
     status = cloud.stack_exists(cloud.name)
     assert(status)
+
+def test_lambda(cloud):
+    lambda_role_name = 'UnitTestLambdaRole'
+    lambda_name = 'UnitTestLambdaFunction'
+    lambda_handler = 'handler'
+    cloud.add_lambda(lambda_name, lambda_handler, lambda_role_name)
+
+    assert(lambda_name in cloud.template.resources)
+
+def test_create_lambda_role(cloud):
+    lambda_role_name = 'UnitTestLambdaRole'
+    role = cloud.create_lambda_role(lambda_role_name)
+    assert(role.name == lambda_role_name)
+
+    role = cloud.create_lambda_role('myName')
+    assert(role.name == 'myName')

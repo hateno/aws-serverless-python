@@ -1,7 +1,7 @@
 import boto3
 import uuid
 
-from troposphere import GetAtt, Output, Template, Ref
+from troposphere import GetAtt, Join, Output, Template, Ref
 from troposphere.apigateway import Integration, Method, RestApi, Resource
 from troposphere.awslambda import Code, Function
 from troposphere.iam import Policy, Role
@@ -21,12 +21,13 @@ class Cloud(object):
         return self._name
 
     def add_s3_bucket(self, bucket_name, bucket_description=''):
-        bucket = self.template.add_resource(Bucket(bucket_name, AccessControl=Private))
+        bucket = Bucket(bucket_name, AccessControl=Private)
+        self.template.add_resource(bucket)
         self.template.add_output(Output(bucket_name, Value=Ref(bucket), Description=bucket_description))
 
     def deploy(self):
         template_body = self.template.to_json()
-        status = self.client.create_stack(StackName=self.name, TemplateBody=template_body)
+        status = self.client.create_stack(StackName=self.name, TemplateBody=template_body, Capabilities=['CAPABILITY_IAM'])
         return status
 
     def stack_exists(self, stack_name):
@@ -35,3 +36,53 @@ class Cloud(object):
             if stack['StackName'] == stack_name:
                 return True
         return False
+
+    def add_lambda(self, lambda_name, lambda_handler, lambda_role_name):
+        role = self.create_lambda_role(lambda_role_name)
+        self.template.add_resource(role)
+
+        code = Code(ZipFile=" ") # add blank function, update later through upload
+        function = Function(
+            lambda_name,
+            Code=code,
+            Handler=lambda_handler,
+            Runtime='python3.6',
+            Role=GetAtt(lambda_role_name, 'Arn')
+        )
+        self.template.add_resource(function)
+
+    def create_lambda_role(self, lambda_role_name='LambdaExecutionRole'):
+        role = Role(lambda_role_name,
+                Path='/',
+                Policies=[Policy(
+                    PolicyName='root',
+                    PolicyDocument={
+                        'Version': '2012-10-17',
+                        'Statement': [{
+                            'Action': ['logs:*'],
+                            'Resource': 'arn:aws:logs:*:*:*',
+                            'Effect': 'Allow'
+                        },
+                        {
+                            'Action': [
+                                's3:GetObject',
+                                's3:PutObject'
+                            ],
+                            'Resource': [
+                                'arn:aws:s3:::*'
+                            ],
+                            'Effect': 'Allow'
+                        }]
+                    })],
+                AssumeRolePolicyDocument={
+                    'Version': '2012-10-17',
+                    'Statement': [{
+                        'Action': ['sts:AssumeRole'],
+                        'Effect': 'Allow',
+                        'Principal': {
+                            'Service': ['lambda.amazonaws.com']
+                        }
+                    }]
+                },
+            )
+        return role
