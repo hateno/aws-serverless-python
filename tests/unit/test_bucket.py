@@ -1,35 +1,9 @@
 import datetime
 import os
 import sys
-import placebo
-import pytest
 import uuid
 
 from sam.bucket import Bucket
-
-@pytest.fixture
-def settings():
-    '''
-    Default settings for bucket object creation
-    '''
-    settings = dict()
-    settings['bucket'] = 'UnitTestBucket'
-    return settings
-
-@pytest.fixture
-def session():
-    import boto3
-    return boto3.Session()
-
-@pytest.fixture
-def pill(tmpdir, session):
-    '''
-    Get placebo for simulate boto3 calls
-    '''
-    pill = placebo.attach(session, tmpdir)
-    pill.playback()
-    yield pill
-    pill.stop()
 
 def test_bucket_initialize(settings, pill):
     bucket = Bucket(settings, pill.session)

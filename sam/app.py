@@ -28,7 +28,7 @@ class App(object):
 
         # import or init settings.json
         if not os.path.isfile(self.SETTINGS_FILE):
-            logger.info('%s does not exist, initializing' % self.SETTINGS_FILE)
+            self.log.info('%s does not exist, initializing' % self.SETTINGS_FILE)
             with open(self.SETTINGS_FILE, 'w') as f:
                 f.write('{}')
         settings_fh = open(self.SETTINGS_FILE, 'r')
