@@ -10,12 +10,7 @@ def test_bucket_initialize(settings, pill):
     assert(bucket.name == settings['bucket'])
 
 def test_bucket_exists(settings, pill):
-    response = {
-        'Buckets': [{
-            'CreationDate': datetime.datetime(2018, 1, 10, 1, 10, 16),
-            'Name': settings['bucket']
-        }]
-    }
+    response = { 'Buckets': [{ 'CreationDate': datetime.datetime(2018, 1, 10, 1, 10, 16), 'Name': settings['bucket'] }] }
     pill.save_response(service='s3', operation='ListBuckets', response_data=response, http_response=200)
 
     bucket = Bucket(settings, pill.session)
@@ -23,9 +18,7 @@ def test_bucket_exists(settings, pill):
     assert(exists)
 
 def test_bucket_does_not_exist(settings, pill):
-    response = {
-        'Buckets': []
-    }
+    response = {'Buckets': []}
     pill.save_response(service='s3', operation='ListBuckets', response_data=response, http_response=200)
 
     bucket = Bucket(settings, pill.session)

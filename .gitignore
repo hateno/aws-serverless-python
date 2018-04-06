@@ -115,5 +115,4 @@ venv.bak/
 # custom
 settings.json
 tmp/
-lambda/
 lambda.zip
