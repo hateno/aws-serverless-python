@@ -1,3 +1,4 @@
+import click
 import json
 import logging
 import os
@@ -60,3 +61,24 @@ class App(object):
         self.log.propogate = False
         self._configure_log_level()
         self.log.addHandler(handler)
+
+@click.group()
+@click.version_option(version=__version__, message='%(prog)s %(version)s')
+@click.option('--debug/--no-debug', default=False, help='Print debug logs to stderr.')
+def cli(ctx, debug=False):
+    ctx.obj.debug = debug
+    ctx.obj.app = App()
+
+@cli.command()
+@click.pass_context
+@click.option('--dry/--no-dry', default=False, help='No changes are committed locally or to AWS')
+def scaffold(ctx, dry=False):
+    click.echo('scaffolding...')
+
+def main():
+    try:
+        return cli(obj={})
+    except Exception as e:
+        import traceback
+        click.echo(traceback.format_exc(), err=True)
+        return 2
