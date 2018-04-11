@@ -1,6 +1,5 @@
 Feature: severless web application scaffolding
 
-    @wip
     @slow
     Scenario: Create a very basic serverless Python web application
         Given user has an AWS account

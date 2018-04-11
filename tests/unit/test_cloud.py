@@ -3,7 +3,7 @@ import pytest
 import uuid
 
 from dateutil.tz import tzutc
-from sam.template import Cloud
+from sam.cloud import Cloud
 
 @pytest.fixture
 def cloud(settings, pill):
@@ -17,9 +17,9 @@ def _validate_resources(cloud):
     for name, resource in cloud.template.resources.items():
         resource.validate()
 
-def test_template(cloud, settings):
+def test_cloud(cloud, settings):
     assert(cloud is not None)
-    assert(cloud.name == settings['template'])
+    assert(cloud.name == settings['name'])
 
 def test_s3_template(cloud):
     s3name = 'UnitTestS3Bucket'
@@ -41,6 +41,15 @@ def test_deploy(cloud, pill):
 
     status = cloud.deploy()
     assert(status['status_code'] == 200)
+
+def test_deploy_dry(cloud, pill):
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': []}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
+    cloud.add_s3_bucket('UnitTestS3Bucket')
+
+    status = cloud.deploy(dry=True)
+    assert(status is None)
 
 def test_deploy_replace(cloud, pill):
     response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': cloud.name, 'StackStatus': 'CREATE_COMPLETE'}]}
@@ -66,13 +75,10 @@ def test_stack_exists(cloud, pill):
     assert(status)
 
 def test_lambda(cloud):
-    lambda_role_name = 'UnitTestLambdaRole'
     lambda_name = 'UnitTestLambdaFunction'
-    lambda_handler = 'handler'
-    cloud.add_lambda(lambda_name, lambda_handler, lambda_role_name)
+    cloud.add_lambda(lambda_name)
 
     assert(lambda_name in cloud.template.resources)
-    assert(lambda_role_name in cloud.template.resources)
 
     _validate_resources(cloud)
 
@@ -83,9 +89,18 @@ def test_create_lambda_role(cloud):
     assert(role.name == lambda_role_name)
     _validate_resources(cloud)
 
-def test_create_api_gateway(cloud):
+def create_api_gateway_fails_without_lambda_function(cloud):
+    apigateway_name = 'UnitTestAPIGateway'
+    with pytest.raises(AssertionError):
+        apigateway = cloud.add_api_gateway(apigateway_name)
+
+def test_create_lambda_first_before_creating_api_gateway(cloud):
+    lambda_name = 'UnitTestLambdaFunction'
+    cloud.add_lambda(lambda_name)
+    assert(lambda_name in cloud.template.resources)
+
     apigateway_name = 'UnitTestAPIGateway'
     apigateway = cloud.add_api_gateway(apigateway_name)
-
     assert(apigateway_name in cloud.template.resources)
+
     _validate_resources(cloud)

@@ -8,7 +8,7 @@ def settings():
     '''
     settings = dict()
     settings['bucket'] = 'UnitTestBucket'
-    settings['template'] = 'UnitTestCloudformation'
+    settings['name'] = 'UnitTestApp'
     return settings
 
 @pytest.fixture

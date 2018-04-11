@@ -2,7 +2,7 @@ import datetime
 import pytest
 
 from dateutil.tz import tzutc
-from sam.template import Cloud
+from sam.cloud import Cloud
 from sam.bucket import Bucket
 
 @pytest.fixture

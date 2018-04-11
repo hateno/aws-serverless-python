@@ -1,4 +1,5 @@
 import boto3
+import logging
 import time
 import uuid
 
@@ -14,8 +15,10 @@ class Cloud(object):
     stage_name = 'v1'
 
     def __init__(self, settings, session=None):
+        self._name = settings['name']
+        self.log = logging.getLogger(self.name)
+
         self.client = boto3.client('cloudformation') if session is None else session.client('cloudformation')
-        self._name = settings['template']
         self.template = Template()
         self.template.add_version(self.version)
 
@@ -27,16 +30,33 @@ class Cloud(object):
         return self._name
 
     def add_s3_bucket(self, bucket_name, bucket_description=''):
+        self.log.info('Adding S3 Bucket %s' % bucket_name)
         bucket = Bucket(bucket_name, AccessControl=Private)
         self.template.add_resource(bucket)
         self.template.add_output(Output(bucket_name, Value=Ref(bucket), Description=bucket_description))
 
-    def deploy(self):
+    def deploy(self, dry=False):
+        """Deploys currently specified Cloudformation template (via troposphere)
+
+        If a Cloudformation stack already exists, then the deploy function will automatically handle
+        deletion of the stack and wait. After the Cloudformation stack is deleted, then the new stack
+        template is uploaded to Cloudformation.
+
+        Args:
+            dry (bool): no changes are transmitted to AWS
+        """
+        self.log.info('Deploying Cloudformation Template...')
         template_body = self.template.to_json()
-        if self.stack_exists(self.name):
+        if self.stack_exists(self.name) and not dry:
+            self.log.info('Cloudformation stack exists, deleting...')
             status = self.client.delete_stack(StackName=self.name)
             while self.stack_exists(self.name):
+                self.log.info('Deleting Cloudformation stack, sleeping for 5 seconds...')
                 time.sleep(5) # add logger
+        self.log.info('Creating Cloudformation stack %s' % self.name)
+        if dry:
+            self.log.warn('Running in dry mode, not deploying...')
+            return None
         status = self.client.create_stack(StackName=self.name, TemplateBody=template_body, Capabilities=['CAPABILITY_IAM'])
         return status
 
@@ -47,8 +67,12 @@ class Cloud(object):
                 return True
         return False
 
-    def add_lambda(self, lambda_name, lambda_handler, lambda_role_name):
-        self.lambda_role = self.create_lambda_role(lambda_role_name)
+    def add_lambda(self, lambda_name, lambda_role_name=None, lambda_handler='index.handler'):
+        self.log.info('Adding AWS Lambda Function %s with handler %s' % (lambda_name, lambda_handler))
+        if lambda_role_name is None:
+            self.lambda_role = self.create_lambda_role()
+        else:
+            self.lambda_role = self.create_lambda_role(lambda_role_name)
         self.template.add_resource(self.lambda_role)
 
         code = Code(ZipFile=Join('\n', [
@@ -68,11 +92,12 @@ class Cloud(object):
             Code=code,
             Handler=lambda_handler,
             Runtime='python3.6',
-            Role=GetAtt(lambda_role_name, 'Arn')
+            Role=GetAtt(self.lambda_role, 'Arn')
         )
         self.template.add_resource(self.lambda_function)
 
     def create_lambda_role(self, lambda_role_name='LambdaExecutionRole'):
+        self.log.info('Creating AWS Lambda Role %s' % lambda_role_name)
         role = Role(lambda_role_name,
                 Path='/',
                 Policies=[Policy(
@@ -123,6 +148,8 @@ class Cloud(object):
         return role
 
     def add_api_gateway(self, apigateway_name):
+        self.log.info('Adding API Gateway %s' % apigateway_name)
+        assert(self.lambda_function is not None)
         # define all value used by api gateway
         lambda_method_name = '%sLambdaMethod' % apigateway_name
         lambda_permission_name = '%sLambdaPermission' % apigateway_name
