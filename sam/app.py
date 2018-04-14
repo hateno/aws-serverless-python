@@ -7,6 +7,7 @@ import sys
 import uuid
 
 import sam.cloud
+import sam.awslambda
 
 __version__ = '0.0.1'
 
@@ -29,6 +30,7 @@ class App(object):
             session (boto3.session.Session): specifies the boto session, only important for testing purposes
         """
         self.log = logging.getLogger(name)
+        self.session = session
         self._debug = debug
         self._configure_logging()
 
@@ -37,7 +39,26 @@ class App(object):
         self.log.info('Current working directory is %s' % os.getcwd())
 
         self._load_settings()
+        self._preload_settings(name)
 
+        self.cloud = sam.cloud.Cloud(self.settings, session=self.session)
+
+    @property
+    def name(self):
+        return self._settings('name')
+
+    @property
+    def function_name(self):
+        return self._settings('function_name')
+
+    @property
+    def rest_name(self):
+        return self._settings('rest_name')
+
+    def _settings(self, key):
+        return None if self.settings is None else self.settings[key]
+
+    def _preload_settings(self, name):
         if 'name' not in self.settings:
             if name is None:
                 self.settings['name'] = 'MyWebApplication' + str(uuid.uuid4()).split('-')[-1]
@@ -46,19 +67,25 @@ class App(object):
         else:
             self.log.warn('Using name %s from settings.json' % self.settings['name'])
 
-        self.cloud = sam.cloud.Cloud(self.settings, session=session)
+        if 'function_name' not in self.settings:
+            self.settings['function_name'] = '%sFunction' % self.name
 
-    @property
-    def name(self):
-        return None if self.settings is None else self.settings['name']
+        if 'rest_name' not in self.settings:
+            self.settings['rest_name'] = '%sAPIGateway' % self.name
+
+    def _lambda_dir_exists(self):
+        return os.path.exists('./%s' % self.LAMBDA_DIR)
+
+    def _package_lambda(self):
+        self.log.info('Creating lambda.zip') # create lambda.zip
+        shutil.make_archive('lambda', 'zip', './%s' % self.LAMBDA_DIR)
 
     def _load_settings(self):
         # validate existence of ./lambda/ directory
-        if not os.path.exists('./%s' % self.LAMBDA_DIR):
+        if not self._lambda_dir_exists():
             self.log.info('Lambda directory does not exist, creating one...')
             os.mkdir('./%s' % self.LAMBDA_DIR)
-        self.log.info('Creating lambda.zip') # create lambda.zip
-        shutil.make_archive('lambda', 'zip', './%s' % self.LAMBDA_DIR)
+        self._package_lambda()
 
         # import or init settings.json
         if not os.path.isfile(self.SETTINGS_FILE):
@@ -102,10 +129,10 @@ class App(object):
         self._configure_log_level()
         self.log.addHandler(handler)
 
-    def scaffold(self, function_name, rest_name, dry=False):
+    def scaffold(self, dry=False):
         self.log.info('Creating scaffold in AWS cloud...')
-        self.cloud.add_lambda(function_name)
-        self.cloud.add_api_gateway(rest_name)
+        self.cloud.add_lambda(self.function_name)
+        self.cloud.add_api_gateway(self.rest_name)
         status = self.cloud.deploy(dry=dry)
         return status
 
@@ -113,6 +140,21 @@ class App(object):
         if stack_name is None:
             stack_name = self.name
         status = self.cloud.stack_exists(stack_name)
+        return status
+
+    def upload_lambda_code(self):
+        '''
+        Packages the lambda/ directory and upload it to AWS Lambda
+        '''
+        if not self._lambda_dir_exists():
+            self.log.error('Lambda directory not found')
+            return None
+        if self.settings['function_name'] is None:
+            self.log.error('Scaffold does not exist, please scaffold first')
+            return None
+        self._package_lambda()
+        awslambda = sam.awslambda.Lambda(self.settings, session=self.session)
+        status = awslambda.update(code='lambda.zip')
         return status
 
 ##
@@ -129,13 +171,11 @@ def cli(ctx, debug=False):
 
 @cli.command()
 @click.option('--dry/--no-dry', default=False, help='No changes are committed locally or to AWS')
-@click.argument('function_name')
-@click.argument('rest_name')
 @click.pass_context
-def scaffold(ctx, function_name, rest_name, dry=False):
+def scaffold(ctx, dry=False):
     app = ctx.obj['app']
     click.echo('scaffolding...')
-    status = app.scaffold(function_name, rest_name, dry=dry)
+    status = app.scaffold(dry=dry)
 
 @cli.command()
 @click.option('--stack', type=str, default=None, nargs=1)

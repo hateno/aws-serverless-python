@@ -1,6 +1,8 @@
 import click
 import datetime
+import json
 import os
+import shutil
 import sys
 import pytest
 
@@ -20,17 +22,17 @@ def runner():
 @pytest.fixture
 def obj(pill):
     o = {}
-    o['debug'] = True
+    o['debug'] = False
     o['app'] = sam.app.App(name=APP_NAME, session=pill.session)
     return o
 
 def test_settings_initialized(tmpdir):
-    app = App(debug=True, cwd=tmpdir)
+    app = App(debug=False, cwd=tmpdir)
     assert(type(app.settings) == dict)
 
 def test_settings_save(tmpdir):
     assert(not os.path.isfile(str(tmpdir) + '/settings.json'))
-    app = App(debug=True, cwd=tmpdir)
+    app = App(debug=False, cwd=tmpdir)
     assert(app._save_settings())
     assert(os.path.isfile(str(tmpdir) + '/settings.json'))
 
@@ -41,16 +43,14 @@ def test_scaffold(tmpdir, pill):
     response = { "status_code": 200, "data": { "StackId": "arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz", "ResponseMetadata": { "RequestId": "xyz", "HTTPStatusCode": 200, "HTTPHeaders": { "x-amzn-requestid": "xyz", "content-type": "text/xml", "content-length": "123"}, "RetryAttempts": 0 } } }
     pill.save_response(service='cloudformation', operation='CreateStack', response_data=response, http_response=200)
 
-    lambda_function_name = 'UnitTestFunction'
-    apigateway_name = 'UnitTestRestAPIGateway'
-    app = App(debug=True, cwd=tmpdir, session=pill.session)
-    status = app.scaffold(lambda_function_name, apigateway_name)
+    app = App(debug=False, cwd=tmpdir, session=pill.session)
+    status = app.scaffold()
 
-    assert(lambda_function_name in app.cloud.template.resources)
-    assert(apigateway_name in app.cloud.template.resources)
+    assert(app.function_name in app.cloud.template.resources)
+    assert(app.rest_name in app.cloud.template.resources)
     assert(status['status_code'] == 200)
 
-def test_check_check(tmpdir, pill):
+def test_check_stack_exists(tmpdir, pill):
     stack_name = 'UnitTestStack'
     response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': stack_name, 'StackStatus': 'CREATE_COMPLETE'}]}
     pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
@@ -58,13 +58,49 @@ def test_check_check(tmpdir, pill):
     response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': APP_NAME, 'StackStatus': 'CREATE_COMPLETE'}]}
     pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
 
-    app = App(name=APP_NAME, debug=True, cwd=tmpdir, session=pill.session)
+    app = App(name=APP_NAME, debug=False, cwd=tmpdir, session=pill.session)
 
     status = app.stack_exists(stack_name)
     assert(status)
 
     status = app.stack_exists()
     assert(status)
+
+def test_upload_lambda_code(tmpdir, pill, settings):
+    function_name = 'UnitTestFunctionName'
+    code_filepath = str(tmpdir) + '/lambda.zip'
+    open(code_filepath, 'a').close()
+
+    response = { "status_code": 200, "data": { "ResponseMetadata": { "RequestId": "xyz", "HTTPStatusCode": 200, "HTTPHeaders": { "date": "123", "content-type": "application/json", "content-length": "649", "connection": "keep-alive", "x-amzn-requestid": "xyz" }, "RetryAttempts": 0 }, "FunctionName": function_name, "FunctionArn": "arn:aws:lambda:us-east-1:123:function:%s" % function_name, "Runtime": "python3.6", "Role": "arn:aws:iam::123:role/xyz", "Handler": "default", "CodeSize": 261, "Description": "", "Timeout": 3, "MemorySize": 128, "LastModified": "123", "CodeSha256": "xyz", "Version": "$LATEST", "TracingConfig": { "Mode": "PassThrough" }, "RevisionId": "6a636cf5-8bdc-4e49-8ca8-bf7e166347d9" } }
+    pill.save_response(service='lambda', operation='UpdateFunctionCode', response_data=response, http_response=200)
+
+    app = App(name=APP_NAME, debug=False, cwd=tmpdir, session=pill.session)
+
+    status = app.upload_lambda_code()
+    assert(status)
+
+def test_lambda_dir_exist_check(tmpdir):
+    app = App(name=APP_NAME, debug=False, cwd=tmpdir)
+    lambda_dir = str(tmpdir) + '/lambda'
+    if os.path.exists(lambda_dir):
+        shutil.rmtree(lambda_dir)
+
+    status = app._lambda_dir_exists()
+    assert(not status)
+
+    os.mkdir(lambda_dir)
+    status = app._lambda_dir_exists()
+    assert(status)
+
+def test_lambda_zip(tmpdir):
+    app = App(name=APP_NAME, debug=False, cwd=tmpdir)
+    lambda_dir = str(tmpdir) + '/lambda'
+    lambda_zip = str(tmpdir) + '/lambda.zip'
+    if not os.path.exists(lambda_dir):
+        os.mkdir(lambda_dir)
+
+    app._package_lambda()
+    assert(os.path.exists(lambda_zip))
 
 def test_cli(runner):
     result = runner.invoke(sam.app.cli, obj={})
@@ -74,9 +110,7 @@ def test_cli_scaffold_dry(runner, obj, pill):
     response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': []}
     pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
 
-    lambda_function_name = 'UnitTestFunction'
-    apigateway_name = 'UnitTestRestAPIGateway'
-    result = runner.invoke(sam.app.scaffold, [lambda_function_name, apigateway_name, '--dry'], obj=obj)
+    result = runner.invoke(sam.app.scaffold, ['--dry'], obj=obj)
     assert(result.exit_code == 0)
     assert(result.output == 'scaffolding...\n')
 
