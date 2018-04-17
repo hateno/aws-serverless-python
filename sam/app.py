@@ -191,6 +191,18 @@ def exists(ctx, stack):
 
     click.echo('stack %s %s' % (stack, status))
 
+@cli.command()
+@click.pass_context
+def update(ctx):
+    app = ctx.obj['app']
+    result = app.upload_lambda_code()
+    status = 'lambda function %s' % app.function_name
+    if not result:
+        status += ' not'
+    status += ' updated'
+
+    click.echo(status)
+
 def main():
     try:
         return cli(obj={})
