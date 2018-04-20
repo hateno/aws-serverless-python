@@ -15,7 +15,7 @@ class Cloud(object):
     stage_name = 'v1'
 
     def __init__(self, settings, session=None):
-        self._name = settings['name']
+        self._name = settings['name'] # TODO error check
         self.log = logging.getLogger(self.name)
 
         self.client = boto3.client('cloudformation') if session is None else session.client('cloudformation')
@@ -28,6 +28,18 @@ class Cloud(object):
     @property
     def name(self):
         return self._name
+
+    @property
+    def function_name(self):
+        if self.lambda_function is None or not self.is_deployed():
+            return None
+        function_resource = self.get_resource(Function.resource_type)
+        function_name = function_resource['PhysicalResourceId']
+        return function_name
+
+    def is_deployed(self):
+        result = self.stack_exists(self.name)
+        return result
 
     def add_s3_bucket(self, bucket_name, bucket_description=''):
         self.log.info('Adding S3 Bucket %s' % bucket_name)
@@ -52,7 +64,7 @@ class Cloud(object):
             status = self.client.delete_stack(StackName=self.name)
             while self.stack_exists(self.name):
                 self.log.info('Deleting Cloudformation stack, sleeping for 5 seconds...')
-                time.sleep(5) # add logger
+                time.sleep(5)
         self.log.info('Creating Cloudformation stack %s' % self.name)
         if dry:
             self.log.warn('Running in dry mode, not deploying...')
@@ -66,6 +78,18 @@ class Cloud(object):
             if stack['StackName'] == stack_name:
                 return True
         return False
+
+    def list_stack_resources(self):
+        response = self.client.list_stack_resources(StackName=self.name)
+        resources = response['data']['StackResourceSummaries']
+        return resources
+
+    def get_resource(self, resource_type):
+        resources = self.list_stack_resources()
+        for resource in resources:
+            if resource['ResourceType'] == resource_type:
+                return resource
+        return None
 
     def add_lambda(self, lambda_name, lambda_role_name=None, lambda_handler='index.handler'):
         self.log.info('Adding AWS Lambda Function %s with handler %s' % (lambda_name, lambda_handler))

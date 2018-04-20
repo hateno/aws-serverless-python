@@ -146,6 +146,10 @@ class App(object):
         '''
         Packages the lambda/ directory and upload it to AWS Lambda
         '''
+        function_name = self.cloud.function_name
+        if function_name is None:
+            self.log.error('AWS Lambda Function not deployed to cloud, please deploy first')
+            return None
         if not self._lambda_dir_exists():
             self.log.error('Lambda directory not found')
             return None
@@ -153,6 +157,7 @@ class App(object):
             self.log.error('Scaffold does not exist, please scaffold first')
             return None
         self._package_lambda()
+        # retrieve function_name from cloudformation stack
         awslambda = sam.awslambda.Lambda(self.settings, session=self.session)
         status = awslambda.update(code='lambda.zip')
         return status

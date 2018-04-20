@@ -2,6 +2,9 @@ import datetime
 import pytest
 import uuid
 
+import troposphere.awslambda
+import troposphere.iam
+
 from dateutil.tz import tzutc
 from sam.cloud import Cloud
 
@@ -104,3 +107,43 @@ def test_create_lambda_first_before_creating_api_gateway(cloud):
     assert(apigateway_name in cloud.template.resources)
 
     _validate_resources(cloud)
+
+def test_list_stack_resources(cloud, pill):
+    response = { "status_code": 200, "data": { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": "AWS::IAM::Role", "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] } }
+    pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
+
+    resources = cloud.list_stack_resources()
+    assert(resources[0]['PhysicalResourceId'] == cloud.name)
+
+def test_get_stack_resource_by_type(cloud, pill):
+    response = { "status_code": 200, "data": { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": troposphere.iam.Role.resource_type, "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] } }
+    pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
+
+    resource = cloud.get_resource(troposphere.iam.Role.resource_type)
+    assert(resource['PhysicalResourceId'] == cloud.name)
+
+def test_get_stack_resource_not_found(cloud, pill):
+    response = { 'status_code': 200, 'data': { 'StackResourceSummaries': [] } }
+    pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
+
+    resource = cloud.get_resource('')
+    assert(resource is None)
+
+def test_get_cloud_function_name(cloud, pill):
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': cloud.name, 'StackStatus': 'CREATE_COMPLETE'}]}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
+    response = { "status_code": 200, "data": { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": troposphere.awslambda.Function.resource_type, "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] } }
+    pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
+
+    function_name = 'UnitTestFunctionName'
+    cloud.add_lambda(function_name)
+    cloud_function_name = cloud.function_name
+    assert(cloud.name == cloud_function_name)
+
+def test_is_deployed(cloud, pill):
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': cloud.name, 'StackStatus': 'CREATE_COMPLETE'}]}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
+    result = cloud.is_deployed()
+    assert(result)
