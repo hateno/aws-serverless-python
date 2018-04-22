@@ -41,7 +41,7 @@ class Lambda:
             if not os.path.exists(code):
                 raise FileNotFoundError('%s not found' % code)
             response = self.client.update_function_code(FunctionName=function_name, ZipFile=open(code, 'rb').read())
-            if response['status_code'] != 200:
+            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
                 return response
 
 

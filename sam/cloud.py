@@ -31,7 +31,7 @@ class Cloud(object):
 
     @property
     def function_name(self):
-        if self.lambda_function is None or not self.is_deployed():
+        if not self.is_deployed():
             return None
         function_resource = self.get_resource(Function.resource_type)
         function_name = function_resource['PhysicalResourceId']
@@ -81,7 +81,7 @@ class Cloud(object):
 
     def list_stack_resources(self):
         response = self.client.list_stack_resources(StackName=self.name)
-        resources = response['data']['StackResourceSummaries']
+        resources = response['StackResourceSummaries']
         return resources
 
     def get_resource(self, resource_type):

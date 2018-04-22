@@ -159,7 +159,7 @@ class App(object):
         self._package_lambda()
         # retrieve function_name from cloudformation stack
         awslambda = sam.awslambda.Lambda(self.settings, session=self.session)
-        status = awslambda.update(code='lambda.zip')
+        status = awslambda.update(function_name=function_name, code='lambda.zip')
         return status
 
 ##
@@ -201,7 +201,7 @@ def exists(ctx, stack):
 def update(ctx):
     app = ctx.obj['app']
     result = app.upload_lambda_code()
-    status = 'lambda function %s' % app.function_name
+    status = 'lambda function %s' % app.cloud.function_name
     if not result:
         status += ' not'
     status += ' updated'

@@ -109,21 +109,21 @@ def test_create_lambda_first_before_creating_api_gateway(cloud):
     _validate_resources(cloud)
 
 def test_list_stack_resources(cloud, pill):
-    response = { "status_code": 200, "data": { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": "AWS::IAM::Role", "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] } }
+    response = { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": "AWS::IAM::Role", "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] }
     pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
 
     resources = cloud.list_stack_resources()
     assert(resources[0]['PhysicalResourceId'] == cloud.name)
 
 def test_get_stack_resource_by_type(cloud, pill):
-    response = { "status_code": 200, "data": { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": troposphere.iam.Role.resource_type, "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] } }
+    response = { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": troposphere.iam.Role.resource_type, "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] }
     pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
 
     resource = cloud.get_resource(troposphere.iam.Role.resource_type)
     assert(resource['PhysicalResourceId'] == cloud.name)
 
 def test_get_stack_resource_not_found(cloud, pill):
-    response = { 'status_code': 200, 'data': { 'StackResourceSummaries': [] } }
+    response = { 'StackResourceSummaries': [] }
     pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
 
     resource = cloud.get_resource('')
@@ -133,7 +133,7 @@ def test_get_cloud_function_name(cloud, pill):
     response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': cloud.name, 'StackStatus': 'CREATE_COMPLETE'}]}
     pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
 
-    response = { "status_code": 200, "data": { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": troposphere.awslambda.Function.resource_type, "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] } }
+    response = { "StackResourceSummaries": [ { "LogicalResourceId": "LambdaExecutionRole", "PhysicalResourceId": cloud.name, "ResourceType": troposphere.awslambda.Function.resource_type, "LastUpdatedTimestamp": { "__class__": "datetime", "year": 2018, "month": 3, "day": 18, "hour": 17, "minute": 24, "second": 33, "microsecond": 565000 }, "ResourceStatus": "CREATE_COMPLETE" } ] }
     pill.save_response(service='cloudformation', operation='ListStackResources', response_data=response, http_response=200)
 
     function_name = 'UnitTestFunctionName'
