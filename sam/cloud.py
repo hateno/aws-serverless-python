@@ -79,6 +79,13 @@ class Cloud(object):
                 return True
         return False
 
+    def stack_ready(self, stack_name):
+        stacks = self.client.list_stacks(StackStatusFilter=['CREATE_COMPLETE'])
+        for stack in stacks['StackSummaries']:
+            if stack['StackName'] == stack_name:
+                return True
+        return False
+
     def list_stack_resources(self):
         response = self.client.list_stack_resources(StackName=self.name)
         resources = response['StackResourceSummaries']

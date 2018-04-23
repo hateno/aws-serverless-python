@@ -137,9 +137,13 @@ class App(object):
         return status
 
     def stack_exists(self, stack_name=None):
-        if stack_name is None:
-            stack_name = self.name
+        stack_name = self.name if stack_name is None else stack_name
         status = self.cloud.stack_exists(stack_name)
+        return status
+
+    def stack_ready(self, stack_name=None):
+        stack_name = self.name if stack_name is None else stack_name
+        status = self.cloud.stack_ready(stack_name)
         return status
 
     def upload_lambda_code(self):
@@ -184,15 +188,18 @@ def scaffold(ctx, dry=False):
 
 @cli.command()
 @click.option('--stack', type=str, default=None, nargs=1)
+@click.option('--ready/--no-ready', default=False, help='If stack is in status CREATE_COMPLETE')
 @click.pass_context
-def exists(ctx, stack):
+def exists(ctx, stack, ready):
     app = ctx.obj['app']
     if stack is None:
         stack = app.name
-    result = app.stack_exists(stack)
-    status = 'exists'
-    if not result:
-        status = 'does not exist'
+    if ready:
+        result = app.stack_ready(stack)
+        status = 'ready' if result else 'not ready'
+    else:
+        result = app.stack_exists(stack)
+        status = 'exists' if result else 'does not exist'
 
     click.echo('stack %s %s' % (stack, status))
 

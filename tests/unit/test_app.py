@@ -71,6 +71,29 @@ def test_check_stack_exists(tmpdir, pill, settings):
     status = app.stack_exists()
     assert(status)
 
+def test_check_stack_ready(tmpdir, pill, settings):
+    stack_name = 'UnitTestStack'
+    stack_name_not = 'UnitTestStackNot'
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': stack_name, 'StackStatus': 'CREATE_COMPLETE'}]}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': settings['name'], 'StackStatus': 'CREATE_COMPLETE'}]}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': []}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
+    app = App(name=settings['name'], debug=False, cwd=tmpdir, session=pill.session)
+
+    status = app.stack_ready(stack_name)
+    assert(status)
+
+    status = app.stack_ready()
+    assert(status)
+
+    status = app.stack_ready(stack_name_not)
+    assert(not status)
+
 def test_upload_lambda_code(tmpdir, pill, settings):
     function_name = 'UnitTestFunctionName'
     code_filepath = str(tmpdir) + '/lambda.zip'
@@ -141,11 +164,17 @@ def test_cli_stack_exists(runner, obj, pill, settings):
     response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': settings['name'], 'StackStatus': 'CREATE_COMPLETE'}]}
     pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
 
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': settings['name'], 'StackStatus': 'CREATE_COMPLETE'}]}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
     result = runner.invoke(sam.app.exists, ['--stack', stack_name], obj=obj)
     assert(result.output == 'stack %s exists\n' % stack_name)
 
     result = runner.invoke(sam.app.exists, obj=obj)
     assert(result.output == 'stack %s exists\n' % settings['name'])
+
+    result = runner.invoke(sam.app.exists, ['--ready'], obj=obj)
+    assert(result.output == 'stack %s ready\n' % settings['name'])
 
 def test_cli_upload_lambda_code(runner, obj, pill, settings):
     function_name = obj['app'].function_name

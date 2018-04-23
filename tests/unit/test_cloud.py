@@ -77,6 +77,13 @@ def test_stack_exists(cloud, pill):
     status = cloud.stack_exists(cloud.name)
     assert(status)
 
+def test_stack_ready(cloud, pill):
+    response = {'ResponseMetadata': {'HTTPHeaders': {'content-length': '123', 'content-type': 'text/xml', 'date': 'xyz', 'x-amzn-requestid': 'xyz'}, 'HTTPStatusCode': 200, 'RequestId': 'xyz', 'RetryAttempts': 0}, 'StackSummaries': [{'CreationTime': datetime.datetime(2018, 1, 1, tzinfo=tzutc()), 'StackId': 'arn:aws:cloudformation:us-east-1:123:stack/TestStackName/xyz', 'StackName': cloud.name, 'StackStatus': 'CREATE_COMPLETE'}]}
+    pill.save_response(service='cloudformation', operation='ListStacks', response_data=response, http_response=200)
+
+    status = cloud.stack_ready(cloud.name)
+    assert(status)
+
 def test_lambda(cloud):
     lambda_name = 'UnitTestLambdaFunction'
     cloud.add_lambda(lambda_name)
