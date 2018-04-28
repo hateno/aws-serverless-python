@@ -1,4 +1,7 @@
 # -- FILE: features/environment.py
+from behave import use_fixture
+from features.fixtures import *
+
 # USE: behave -D DEBUG         (to enable  debug-on-error)
 # USE: behave -D DEBUG=yes     (to enable  debug-on-error)
 # USE: behave -D DEBUG=no      (to disable debug-on-error)
@@ -17,3 +20,11 @@ def after_step(context, step):
         # NOTE: Use IPython debugger, same for pdb (basic python debugger).
         import ipdb
         ipdb.post_mortem(step.exc_traceback)
+
+def before_tag(context, tag):
+    if tag == 'fixture.app':
+        use_fixture(app, context)
+    if tag == 'fixture.scaffold':
+        use_fixture(scaffold, context)
+    if tag == 'fixture.logging':
+        use_fixture(setlog, context)
